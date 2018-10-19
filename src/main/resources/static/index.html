@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Hello queue</title>
+    <script src="http://cdn.bootcss.com/stomp.js/2.3.3/stomp.min.js"></script>
+	<script src="https://cdn.bootcss.com/sockjs-client/1.1.4/sockjs.min.js"></script>
+    <script src="jquery-1.11.0.min.js"></script>   
+</head>
+<body>
+<noscript><h2 style="color: #ff0000">你的浏览器太低了连JavaScript都不支持</h2></noscript>
+<div>
+    <div>
+        <labal>用户</labal><input type="text" id="user"/>
+        <button id="connect" onclick="connect();">连接</button>
+        <button id="disconnect" disabled="disabled" onclick="disconnect();">断开</button>
+    </div>
+    <div id="conversationDiv">
+        <labal>接收人</labal><input type="text" id="toName" />
+        <labal>消息内容</labal><input type="text" id="contentMsg" />
+        <button id="sendName" onclick="sendName();">发送私人消息</button>
+        <button id="sendQun" onclick="sendQun();">发送群消息</button>
+        <div id="responseMsg"></div>
+    </div>
+</div>
+
+<script type="text/javascript">
+	var stomp = null;
+	function connect(){
+		var token = $("#user").val();
+		var sock = new SockJS('/api/websocket?token=' + token);  //连接节点
+		//var sock = new SockJS('/api/websocket');  //连接节点
+		//var sock = new WebSocket("ws://localhost:8086/api/websocket");
+		stomp = Stomp.over(sock);
+		stomp.connect({}, function(frame){  //连接成功后订阅消息接口
+		    //订阅个人消息
+		    stomp.subscribe('/user/queue/msg/new', function(response){
+		        var result = JSON.parse(response.body);
+	    	    var html = '<div>个人消息：发送人：'+result.fromName+ '内容：'+result.content +'</div>';
+	        	$("#responseMsg").append(html);
+		    },function(sss){
+		    	alert(sss);
+		    });
+		    //消息发送结果
+		    stomp.subscribe('/user/queue/msg/result', function(response){
+		    	var result = JSON.parse(response.body);
+	    	    var html = '<div>发送结果：发送人：'+result.fromName+ ' 接收人：'+result.toName+'内容：'+result.content +'</div>';
+	        	$("#responseMsg").append(html);
+		    });
+
+		    //订阅广播消息
+		    stomp.subscribe('/topic/notice', function(response){
+		    	//TODO something
+		    	var result = JSON.parse(response.body);
+	    	    var html = '<div>广播消息：发送人：'+result.fromName+ '内容：'+result.content +'</div>';
+	        	$("#responseMsg").append(html);
+		    });
+		});
+	}
+	//私人消息
+	function sendName(){
+		var msg = {
+			    toName: $("#toName").val(),
+			    content: $("#contentMsg").val()
+			};
+			stomp.send('/app/msg', {}, JSON.stringify(msg));
+	}
+	//群消息
+	function sendQun(){
+		//发送广播
+		var msg = {
+			    content: $("#contentMsg").val()
+			};
+		//stomp.send('/app/addNotice', {}, JSON.stringify(msg));
+		$.ajax({  
+            type : "post",  //提交方式  
+            url : "/hellos",//路径  
+            data : JSON.stringify(msg),//数据，这里使用的是Json格式进行传输 
+            contentType: "application/json; charset=utf-8",
+            dataType: "json",//返回值类型
+            success : function(result) {//返回数据根据结果进行相应的处理  
+                alert(result);
+            }  
+        });  
+		
+		var msg = {
+			    content: "Ping"
+			};
+		//stomp.send('/app/heartbeatPing', {}, JSON.stringify(msg));
+		
+	}
+</script>
+</body>
+</html>
